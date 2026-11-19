@@ -1,0 +1,10 @@
+bind = "127.0.0.1:8005"
+workers = 3
+worker_class = "sync"
+timeout = 120
+keepalive = 5
+max_requests = 1000
+max_requests_jitter = 100
+accesslog = "/var/www/vyapar/vyapar_backend/deploy/access.log"
+errorlog = "/var/www/vyapar/vyapar_backend/deploy/error.log"
+loglevel = "info"

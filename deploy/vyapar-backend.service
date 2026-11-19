@@ -1,0 +1,17 @@
+[Unit]
+Description=Vyapar Backend Gunicorn
+After=network.target
+
+[Service]
+User=root
+Group=www-data
+WorkingDirectory=/var/www/vyapar/vyapar_backend
+EnvironmentFile=/var/www/vyapar/vyapar_backend/.env
+ExecStart=/var/www/vyapar/vyapar_backend/venv/bin/gunicorn \
+    --config /var/www/vyapar/vyapar_backend/deploy/gunicorn.conf.py \
+    vyapar_project.wsgi:application
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

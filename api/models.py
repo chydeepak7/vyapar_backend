@@ -117,6 +117,13 @@ class Item(models.Model):
     barcode = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
     mrp = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    # Carton / Piece conversion
+    pieces_per_carton = models.PositiveIntegerField(default=1,
+        help_text='How many pieces/items are in one carton')
+    carton_purchase_price = models.DecimalField(max_digits=24, decimal_places=10, default=0,
+        help_text='Purchase price per carton (auto-calculated or manually set)')
+    carton_sale_price = models.DecimalField(max_digits=24, decimal_places=10, default=0,
+        help_text='Sale price per carton (auto-calculated or manually set)')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

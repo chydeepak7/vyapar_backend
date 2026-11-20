@@ -2,7 +2,36 @@ from rest_framework import serializers
 from .models import (
     BusinessProfile, Party, Item, Transaction, TransactionLine,
     Expense, OtherIncome, BankAccount, Settings,
+    Category, Unit, Warehouse, OpeningStock,
 )
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    item_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'description', 'created_at', 'item_count']
+
+    def get_item_count(self, obj):
+        return obj.items.count()
+
+
+class UnitSerializer(serializers.ModelSerializer):
+    item_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Unit
+        fields = ['id', 'name', 'short_name', 'created_at', 'item_count']
+
+    def get_item_count(self, obj):
+        return obj.items.count()
+
+
+class WarehouseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Warehouse
+        fields = '__all__'
 
 
 class BusinessProfileSerializer(serializers.ModelSerializer):
@@ -18,8 +47,27 @@ class PartySerializer(serializers.ModelSerializer):
 
 
 class ItemSerializer(serializers.ModelSerializer):
+    category_detail = CategorySerializer(source='category', read_only=True)
+    unit_detail = UnitSerializer(source='unit', read_only=True)
+
     class Meta:
         model = Item
+        fields = '__all__'
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        # Provide convenient string fields so frontend forms work without change
+        rep['category_name'] = instance.category.name if instance.category else instance.category_name
+        rep['unit_name'] = instance.unit.short_name if instance.unit else instance.unit_name
+        return rep
+
+
+class OpeningStockSerializer(serializers.ModelSerializer):
+    item_name = serializers.CharField(source='item.name', read_only=True)
+    warehouse_name = serializers.CharField(source='warehouse.name', read_only=True, allow_null=True)
+
+    class Meta:
+        model = OpeningStock
         fields = '__all__'
 
 

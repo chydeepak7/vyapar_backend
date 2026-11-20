@@ -9,12 +9,58 @@ from rest_framework.response import Response
 from .models import (
     BusinessProfile, Party, Item, Transaction, Expense,
     OtherIncome, BankAccount, Settings,
+    Category, Unit, Warehouse, OpeningStock,
 )
 from .serializers import (
     BusinessProfileSerializer, PartySerializer, ItemSerializer,
     TransactionSerializer, ExpenseSerializer, OtherIncomeSerializer,
     BankAccountSerializer, SettingsSerializer,
+    CategorySerializer, UnitSerializer, WarehouseSerializer, OpeningStockSerializer,
 )
+
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+
+class UnitViewSet(viewsets.ModelViewSet):
+    queryset = Unit.objects.all()
+    serializer_class = UnitSerializer
+
+
+class WarehouseViewSet(viewsets.ModelViewSet):
+    queryset = Warehouse.objects.all()
+    serializer_class = WarehouseSerializer
+
+
+class OpeningStockViewSet(viewsets.ModelViewSet):
+    queryset = OpeningStock.objects.select_related('item', 'warehouse').all()
+    serializer_class = OpeningStockSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        item_id = self.request.query_params.get('item')
+        if item_id:
+            qs = qs.filter(item_id=item_id)
+        warehouse_id = self.request.query_params.get('warehouse')
+        if warehouse_id:
+            qs = qs.filter(warehouse_id=warehouse_id)
+        return qs
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        # Adjust item stock when opening stock entry is created
+        item = instance.item
+        item.stock += instance.quantity
+        item.save()
+
+    def perform_destroy(self, instance):
+        # Reverse stock when deleted
+        item = instance.item
+        item.stock -= instance.quantity
+        item.save()
+        instance.delete()
 
 
 class BusinessProfileViewSet(viewsets.ModelViewSet):

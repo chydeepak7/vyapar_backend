@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     BusinessProfile, Party, Item, Transaction, TransactionLine,
     Expense, OtherIncome, BankAccount, Settings,
+    Category, Unit, Warehouse, OpeningStock,
 )
 
 
@@ -57,3 +58,28 @@ class BankAccountAdmin(admin.ModelAdmin):
 
 admin.site.register(Settings)
 admin.site.register(TransactionLine)
+
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)
+
+
+@admin.register(Unit)
+class UnitAdmin(admin.ModelAdmin):
+    list_display = ('short_name', 'name')
+    search_fields = ('name', 'short_name')
+
+
+@admin.register(Warehouse)
+class WarehouseAdmin(admin.ModelAdmin):
+    list_display = ('name', 'contact_person', 'phone', 'is_default')
+    list_filter = ('is_default',)
+
+
+@admin.register(OpeningStock)
+class OpeningStockAdmin(admin.ModelAdmin):
+    list_display = ('item', 'warehouse', 'quantity', 'rate', 'date')
+    list_filter = ('warehouse', 'date')
+    search_fields = ('item__name',)

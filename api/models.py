@@ -1,6 +1,48 @@
 from django.db import models
 
 
+# ============ Master Setup Models ============
+
+class Category(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name_plural = 'Categories'
+
+    def __str__(self):
+        return self.name
+
+
+class Unit(models.Model):
+    name = models.CharField(max_length=50, unique=True)   # e.g. "Pieces"
+    short_name = models.CharField(max_length=20, unique=True)  # e.g. "PCS"
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f'{self.short_name} – {self.name}'
+
+
+class Warehouse(models.Model):
+    name = models.CharField(max_length=255)
+    address = models.TextField(blank=True)
+    contact_person = models.CharField(max_length=100, blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class BusinessProfile(models.Model):
     name = models.CharField(max_length=255, default='My Business')
     phone = models.CharField(max_length=30, blank=True)
@@ -40,6 +82,8 @@ class Party(models.Model):
     opening_balance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     balance_type = models.CharField(max_length=20, choices=BALANCE_TYPES, default='To Receive')
     group = models.CharField(max_length=100, blank=True)
+    credit_limit = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    payment_terms = models.CharField(max_length=100, blank=True)  # e.g. "Net 30"
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -47,15 +91,18 @@ class Party(models.Model):
 
 
 class Item(models.Model):
-    UNIT_CHOICES = [
-        ('PCS', 'PCS'), ('KG', 'KG'), ('LTR', 'LTR'), ('MTR', 'MTR'),
-        ('BOX', 'BOX'), ('SET', 'SET'), ('NOS', 'NOS'), ('PAIR', 'PAIR'),
-        ('ROLL', 'ROLL'), ('BAG', 'BAG'),
-    ]
     name = models.CharField(max_length=255)
-    category = models.CharField(max_length=100, blank=True)
+    category = models.ForeignKey(
+        Category, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='items',
+    )
+    category_name = models.CharField(max_length=100, blank=True)  # denormalised fallback
     hsn = models.CharField(max_length=20, blank=True)
-    unit = models.CharField(max_length=20, choices=UNIT_CHOICES, default='PCS')
+    unit = models.ForeignKey(
+        Unit, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='items',
+    )
+    unit_name = models.CharField(max_length=20, blank=True)  # denormalised fallback
     sale_price = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     purchase_price = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
@@ -212,3 +259,22 @@ class Settings(models.Model):
 
     def __str__(self):
         return 'App Settings'
+
+
+class OpeningStock(models.Model):
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='opening_stocks')
+    warehouse = models.ForeignKey(
+        Warehouse, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='opening_stocks',
+    )
+    quantity = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    rate = models.DecimalField(max_digits=14, decimal_places=2, default=0)   # purchase/cost price at time of entry
+    date = models.DateField()
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date']
+
+    def __str__(self):
+        return f'{self.item.name} – {self.quantity}'

@@ -25,7 +25,38 @@ class CreateUserSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password')
         user = User(**validated_data)
         user.set_password(password)
+        user.is_staff = validated_data.get('is_superuser', False)
         user.save()
+        # Bootstrap default Settings + BusinessProfile for the new user
+        from .models import BusinessProfile, Settings
+        BusinessProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'name': 'My Business',
+                'currency': '₹',
+                'decimal_places': 2,
+            },
+        )
+        Settings.objects.get_or_create(
+            user=user,
+            defaults={
+                'tax_rates': [0, 5, 12, 18, 28],
+                'invoice_prefix': 'INV',
+                'purchase_prefix': 'PUR',
+                'estimate_prefix': 'EST',
+                'payment_in_prefix': 'PIN',
+                'payment_out_prefix': 'POU',
+                'credit_note_prefix': 'CN',
+                'debit_note_prefix': 'DN',
+                'default_payment_terms': '30',
+                'enable_gst': True,
+                'inclusive_tax': False,
+                'round_off': True,
+                'invoice_theme': 'classic',
+                'print_company_info': True,
+                'print_terms': True,
+            },
+        )
         return user
 
 

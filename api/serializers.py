@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
-    BusinessProfile, Party, Item, Transaction, TransactionLine,
+    BusinessProfile, Party, Item, ItemUnitConversion,
+    Transaction, TransactionLine,
     Expense, OtherIncome, BankAccount, Settings,
     Category, Unit, Warehouse, OpeningStock,
 )
@@ -105,9 +106,16 @@ class PartySerializer(serializers.ModelSerializer):
         extra_kwargs = {'user': {'read_only': True}}
 
 
+class ItemUnitConversionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ItemUnitConversion
+        fields = ['id', 'unit_name', 'conversion_factor', 'purchase_price', 'sale_price']
+
+
 class ItemSerializer(serializers.ModelSerializer):
     category_detail = CategorySerializer(source='category', read_only=True)
     unit_detail = UnitSerializer(source='unit', read_only=True)
+    unit_conversions = ItemUnitConversionSerializer(many=True, required=False)
 
     class Meta:
         model = Item
@@ -116,10 +124,30 @@ class ItemSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        # Provide convenient string fields so frontend forms work without change
         rep['category_name'] = instance.category.name if instance.category else instance.category_name
         rep['unit_name'] = instance.unit.short_name if instance.unit else instance.unit_name
         return rep
+
+    def _save_conversions(self, item, conversions_data, user):
+        # Replace all conversions for this item
+        item.unit_conversions.all().delete()
+        for c in conversions_data:
+            ItemUnitConversion.objects.create(item=item, user=user, **c)
+
+    def create(self, validated_data):
+        conversions_data = validated_data.pop('unit_conversions', [])
+        item = Item.objects.create(**validated_data)
+        self._save_conversions(item, conversions_data, validated_data.get('user'))
+        return item
+
+    def update(self, instance, validated_data):
+        conversions_data = validated_data.pop('unit_conversions', None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if conversions_data is not None:
+            self._save_conversions(instance, conversions_data, instance.user)
+        return instance
 
 
 class OpeningStockSerializer(serializers.ModelSerializer):
@@ -142,6 +170,7 @@ class TransactionLineSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'item', 'item_name', 'hsn', 'qty', 'free_qty',
             'unit', 'rate', 'discount_percent', 'gst_rate', 'amount',
+            'conversion_factor',
         ]
 
 
@@ -181,7 +210,9 @@ class TransactionSerializer(serializers.ModelSerializer):
         return instance
 
     def _update_stock(self, transaction, lines_data, create=False, restore=False):
-        """Adjust item stock based on transaction lines."""
+        """Adjust item stock based on transaction lines.
+        Uses conversion_factor so that selling 2 Cartons (factor=12) deducts 24 base units.
+        """
         from decimal import Decimal
         if transaction.type not in ('SaleInvoice', 'PurchaseBill'):
             return
@@ -193,12 +224,13 @@ class TransactionSerializer(serializers.ModelSerializer):
                 item = Item.objects.get(id=item_id)
             except Item.DoesNotExist:
                 continue
-            qty = Decimal(line_data.get('qty', 0))
+            qty = Decimal(str(line_data.get('qty', 0)))
+            factor = Decimal(str(line_data.get('conversion_factor', 1)))
+            base_qty = qty * factor   # actual stock units affected
             if restore:
-                # Revert previous effect
-                delta = qty if transaction.type == 'SaleInvoice' else -qty
+                delta = base_qty if transaction.type == 'SaleInvoice' else -base_qty
             elif create:
-                delta = -qty if transaction.type == 'SaleInvoice' else qty
+                delta = -base_qty if transaction.type == 'SaleInvoice' else base_qty
             else:
                 continue
             item.stock += delta

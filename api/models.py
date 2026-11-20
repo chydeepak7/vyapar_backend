@@ -17,6 +17,29 @@ class Category(models.Model):
         return self.name
 
 
+class ItemUnitConversion(models.Model):
+    """
+    Alternate unit for an item with a conversion factor to the item's base unit.
+    Example: 1 Carton = 12 Pieces  →  unit_name='Carton', conversion_factor=12
+    """
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='unit_conversions')
+    unit_name = models.CharField(max_length=50, help_text='e.g. Carton, Box, Dozen, Bag')
+    conversion_factor = models.DecimalField(
+        max_digits=15, decimal_places=4, default=1,
+        help_text='1 of this unit = how many base units (e.g. 1 Carton = 12 pcs → 12)',
+    )
+    purchase_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    sale_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+
+    class Meta:
+        ordering = ['unit_name']
+        unique_together = [('item', 'unit_name')]
+
+    def __str__(self):
+        return f'{self.item.name} – {self.unit_name} (×{self.conversion_factor})'
+
+
 class Unit(models.Model):
     user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=50, unique=True)   # e.g. "Pieces"
@@ -46,6 +69,29 @@ class Warehouse(models.Model):
         return self.name
 
 
+class ItemUnitConversion(models.Model):
+    """
+    Alternate unit for an item with a conversion factor to the item's base unit.
+    Example: 1 Carton = 12 Pieces  →  unit_name='Carton', conversion_factor=12
+    """
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='unit_conversions')
+    unit_name = models.CharField(max_length=50, help_text='e.g. Carton, Box, Dozen, Bag')
+    conversion_factor = models.DecimalField(
+        max_digits=15, decimal_places=4, default=1,
+        help_text='1 of this unit = how many base units (e.g. 1 Carton = 12 pcs → 12)',
+    )
+    purchase_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    sale_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+
+    class Meta:
+        ordering = ['unit_name']
+        unique_together = [('item', 'unit_name')]
+
+    def __str__(self):
+        return f'{self.item.name} – {self.unit_name} (×{self.conversion_factor})'
+
+
 class BusinessProfile(models.Model):
     user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=255, default='My Business')
@@ -64,6 +110,29 @@ class BusinessProfile(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class ItemUnitConversion(models.Model):
+    """
+    Alternate unit for an item with a conversion factor to the item's base unit.
+    Example: 1 Carton = 12 Pieces  →  unit_name='Carton', conversion_factor=12
+    """
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='unit_conversions')
+    unit_name = models.CharField(max_length=50, help_text='e.g. Carton, Box, Dozen, Bag')
+    conversion_factor = models.DecimalField(
+        max_digits=15, decimal_places=4, default=1,
+        help_text='1 of this unit = how many base units (e.g. 1 Carton = 12 pcs → 12)',
+    )
+    purchase_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    sale_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+
+    class Meta:
+        ordering = ['unit_name']
+        unique_together = [('item', 'unit_name')]
+
+    def __str__(self):
+        return f'{self.item.name} – {self.unit_name} (×{self.conversion_factor})'
 
 
 class Party(models.Model):
@@ -95,6 +164,29 @@ class Party(models.Model):
         return self.name
 
 
+class ItemUnitConversion(models.Model):
+    """
+    Alternate unit for an item with a conversion factor to the item's base unit.
+    Example: 1 Carton = 12 Pieces  →  unit_name='Carton', conversion_factor=12
+    """
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='unit_conversions')
+    unit_name = models.CharField(max_length=50, help_text='e.g. Carton, Box, Dozen, Bag')
+    conversion_factor = models.DecimalField(
+        max_digits=15, decimal_places=4, default=1,
+        help_text='1 of this unit = how many base units (e.g. 1 Carton = 12 pcs → 12)',
+    )
+    purchase_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    sale_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+
+    class Meta:
+        ordering = ['unit_name']
+        unique_together = [('item', 'unit_name')]
+
+    def __str__(self):
+        return f'{self.item.name} – {self.unit_name} (×{self.conversion_factor})'
+
+
 class Item(models.Model):
     user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=255)
@@ -117,17 +209,33 @@ class Item(models.Model):
     barcode = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
     mrp = models.DecimalField(max_digits=24, decimal_places=10, default=0)
-    # Carton / Piece conversion
-    pieces_per_carton = models.PositiveIntegerField(default=1,
-        help_text='How many pieces/items are in one carton')
-    carton_purchase_price = models.DecimalField(max_digits=24, decimal_places=10, default=0,
-        help_text='Purchase price per carton (auto-calculated or manually set)')
-    carton_sale_price = models.DecimalField(max_digits=24, decimal_places=10, default=0,
-        help_text='Sale price per carton (auto-calculated or manually set)')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name
+
+
+class ItemUnitConversion(models.Model):
+    """
+    Alternate unit for an item with a conversion factor to the item's base unit.
+    Example: 1 Carton = 12 Pieces  →  unit_name='Carton', conversion_factor=12
+    """
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='unit_conversions')
+    unit_name = models.CharField(max_length=50, help_text='e.g. Carton, Box, Dozen, Bag')
+    conversion_factor = models.DecimalField(
+        max_digits=15, decimal_places=4, default=1,
+        help_text='1 of this unit = how many base units (e.g. 1 Carton = 12 pcs → 12)',
+    )
+    purchase_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    sale_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+
+    class Meta:
+        ordering = ['unit_name']
+        unique_together = [('item', 'unit_name')]
+
+    def __str__(self):
+        return f'{self.item.name} – {self.unit_name} (×{self.conversion_factor})'
 
 
 class Transaction(models.Model):
@@ -194,6 +302,9 @@ class TransactionLine(models.Model):
     discount_percent = models.DecimalField(max_digits=15, decimal_places=10, default=0)
     gst_rate = models.DecimalField(max_digits=15, decimal_places=10, default=0)
     amount = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    # Conversion: how many base-unit stock items does 1 qty of `unit` equal?
+    # e.g. if unit=Carton and 1 Carton = 12 pcs → conversion_factor=12
+    conversion_factor = models.DecimalField(max_digits=15, decimal_places=4, default=1)
 
     def __str__(self):
         return f'{self.item_name} x {self.qty}'
@@ -252,6 +363,29 @@ class BankAccount(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class ItemUnitConversion(models.Model):
+    """
+    Alternate unit for an item with a conversion factor to the item's base unit.
+    Example: 1 Carton = 12 Pieces  →  unit_name='Carton', conversion_factor=12
+    """
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='unit_conversions')
+    unit_name = models.CharField(max_length=50, help_text='e.g. Carton, Box, Dozen, Bag')
+    conversion_factor = models.DecimalField(
+        max_digits=15, decimal_places=4, default=1,
+        help_text='1 of this unit = how many base units (e.g. 1 Carton = 12 pcs → 12)',
+    )
+    purchase_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    sale_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+
+    class Meta:
+        ordering = ['unit_name']
+        unique_together = [('item', 'unit_name')]
+
+    def __str__(self):
+        return f'{self.item.name} – {self.unit_name} (×{self.conversion_factor})'
 
 
 class Settings(models.Model):

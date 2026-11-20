@@ -1,7 +1,7 @@
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .views import (
-    BusinessProfileViewSet, PartyViewSet, ItemViewSet,
+    BusinessProfileViewSet, PartyViewSet, ItemViewSet, ItemUnitConversionViewSet,
     TransactionViewSet, ExpenseViewSet, OtherIncomeViewSet,
     BankAccountViewSet, SettingsViewSet,
     CategoryViewSet, UnitViewSet, WarehouseViewSet, OpeningStockViewSet,
@@ -14,6 +14,7 @@ router = DefaultRouter()
 router.register(r'business', BusinessProfileViewSet, basename='business')
 router.register(r'parties', PartyViewSet, basename='party')
 router.register(r'items', ItemViewSet, basename='item')
+router.register(r'item-unit-conversions', ItemUnitConversionViewSet, basename='itemunitconversion')
 router.register(r'transactions', TransactionViewSet, basename='transaction')
 router.register(r'expenses', ExpenseViewSet, basename='expense')
 router.register(r'other-incomes', OtherIncomeViewSet, basename='otherincome')

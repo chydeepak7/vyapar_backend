@@ -11,7 +11,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth.models import User
 
 from .models import (
-    BusinessProfile, Party, Item, Transaction, Expense,
+    BusinessProfile, Party, Item, ItemUnitConversion, Transaction, Expense,
     OtherIncome, BankAccount, Settings,
     Category, Unit, Warehouse, OpeningStock,
 )
@@ -20,7 +20,7 @@ from .serializers import (
     TransactionSerializer, ExpenseSerializer, OtherIncomeSerializer,
     BankAccountSerializer, SettingsSerializer,
     CategorySerializer, UnitSerializer, WarehouseSerializer, OpeningStockSerializer,
-    UserSerializer, CreateUserSerializer,
+    UserSerializer, CreateUserSerializer, ItemUnitConversionSerializer,
 )
 
 
@@ -97,6 +97,21 @@ class PartyViewSet(UserScopedViewSet):
 class ItemViewSet(UserScopedViewSet):
     queryset = Item.objects.all().order_by('name')
     serializer_class = ItemSerializer
+
+
+class ItemUnitConversionViewSet(UserScopedViewSet):
+    """CRUD for alternate units of a specific item."""
+    serializer_class = ItemUnitConversionSerializer
+
+    def get_queryset(self):
+        qs = ItemUnitConversion.objects.filter(user=self.request.user)
+        item_id = self.request.query_params.get('item')
+        if item_id:
+            qs = qs.filter(item_id=item_id)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 class TransactionViewSet(UserScopedViewSet):

@@ -1,6 +1,5 @@
 from pathlib import Path
 import os
-import dj_database_url
 from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -59,13 +58,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'vyapar_project.wsgi.application'
 
-# Database — uses DATABASE_URL env var on Render, falls back to SQLite locally
+# Database — MySQL via individual DB_* env vars
 DATABASES = {
-    'default': dj_database_url.config(
-        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': config('DB_NAME'),
+        'USER': config('DB_USER'),
+        'PASSWORD': config('DB_PASSWORD'),
+        'HOST': config('DB_HOST', default='127.0.0.1'),
+        'PORT': config('DB_PORT', default='3306'),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
+    }
 }
 
 AUTH_PASSWORD_VALIDATORS = []

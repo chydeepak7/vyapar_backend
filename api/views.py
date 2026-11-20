@@ -2,9 +2,13 @@ from decimal import Decimal
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
-from rest_framework import viewsets, status
-from rest_framework.decorators import api_view
+from rest_framework import viewsets, status, generics
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenObtainPairView
+from django.contrib.auth.models import User
 
 from .models import (
     BusinessProfile, Party, Item, Transaction, Expense,
@@ -16,30 +20,43 @@ from .serializers import (
     TransactionSerializer, ExpenseSerializer, OtherIncomeSerializer,
     BankAccountSerializer, SettingsSerializer,
     CategorySerializer, UnitSerializer, WarehouseSerializer, OpeningStockSerializer,
+    UserSerializer, CreateUserSerializer,
 )
 
 
-class CategoryViewSet(viewsets.ModelViewSet):
+# ============ Base ViewSet with user scoping ============
+class UserScopedViewSet(viewsets.ModelViewSet):
+    """Base ViewSet that filters all data by the authenticated user."""
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class CategoryViewSet(UserScopedViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
 
-class UnitViewSet(viewsets.ModelViewSet):
+class UnitViewSet(UserScopedViewSet):
     queryset = Unit.objects.all()
     serializer_class = UnitSerializer
 
 
-class WarehouseViewSet(viewsets.ModelViewSet):
+class WarehouseViewSet(UserScopedViewSet):
     queryset = Warehouse.objects.all()
     serializer_class = WarehouseSerializer
 
 
-class OpeningStockViewSet(viewsets.ModelViewSet):
+class OpeningStockViewSet(UserScopedViewSet):
     queryset = OpeningStock.objects.select_related('item', 'warehouse').all()
     serializer_class = OpeningStockSerializer
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = super().get_queryset()  # applies user filter from UserScopedViewSet
         item_id = self.request.query_params.get('item')
         if item_id:
             qs = qs.filter(item_id=item_id)
@@ -49,7 +66,7 @@ class OpeningStockViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        instance = serializer.save()
+        instance = serializer.save(user=self.request.user)
         # Adjust item stock when opening stock entry is created
         item = instance.item
         item.stock += instance.quantity
@@ -63,27 +80,27 @@ class OpeningStockViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
-class BusinessProfileViewSet(viewsets.ModelViewSet):
+class BusinessProfileViewSet(UserScopedViewSet):
     queryset = BusinessProfile.objects.all()
     serializer_class = BusinessProfileSerializer
 
 
-class PartyViewSet(viewsets.ModelViewSet):
+class PartyViewSet(UserScopedViewSet):
     queryset = Party.objects.all().order_by('name')
     serializer_class = PartySerializer
 
 
-class ItemViewSet(viewsets.ModelViewSet):
+class ItemViewSet(UserScopedViewSet):
     queryset = Item.objects.all().order_by('name')
     serializer_class = ItemSerializer
 
 
-class TransactionViewSet(viewsets.ModelViewSet):
+class TransactionViewSet(UserScopedViewSet):
     queryset = Transaction.objects.all().order_by('-date', '-id')
     serializer_class = TransactionSerializer
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = super().get_queryset()  # applies user filter from UserScopedViewSet
         txn_type = self.request.query_params.get('type')
         if txn_type:
             qs = qs.filter(type=txn_type)
@@ -99,38 +116,39 @@ class TransactionViewSet(viewsets.ModelViewSet):
         return qs
 
 
-class ExpenseViewSet(viewsets.ModelViewSet):
+class ExpenseViewSet(UserScopedViewSet):
     queryset = Expense.objects.all().order_by('-date')
     serializer_class = ExpenseSerializer
 
 
-class OtherIncomeViewSet(viewsets.ModelViewSet):
+class OtherIncomeViewSet(UserScopedViewSet):
     queryset = OtherIncome.objects.all().order_by('-date')
     serializer_class = OtherIncomeSerializer
 
 
-class BankAccountViewSet(viewsets.ModelViewSet):
+class BankAccountViewSet(UserScopedViewSet):
     queryset = BankAccount.objects.all()
     serializer_class = BankAccountSerializer
 
 
-class SettingsViewSet(viewsets.ModelViewSet):
+class SettingsViewSet(UserScopedViewSet):
     queryset = Settings.objects.all()
     serializer_class = SettingsSerializer
 
 
 # ============ Aggregate / Dashboard endpoint ============
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def dashboard(request):
     """Aggregate business stats for the dashboard."""
-    business = BusinessProfile.objects.first()
+    business = BusinessProfile.objects.filter(user=request.user).first()
     currency = business.currency if business else '₹'
 
-    sales = Transaction.objects.filter(type='SaleInvoice')
-    purchases = Transaction.objects.filter(type='PurchaseBill')
-    expenses = Expense.objects.all()
-    items = Item.objects.all()
-    bank_accounts = BankAccount.objects.all()
+    sales = Transaction.objects.filter(type='SaleInvoice', user=request.user)
+    purchases = Transaction.objects.filter(type='PurchaseBill', user=request.user)
+    expenses = Expense.objects.filter(user=request.user)
+    items = Item.objects.filter(user=request.user)
+    bank_accounts = BankAccount.objects.filter(user=request.user)
 
     now = datetime.now()
     month_start = now.replace(day=1).date()
@@ -190,7 +208,7 @@ def dashboard(request):
     ]
 
     # Recent transactions
-    recent_qs = Transaction.objects.order_by('-date', '-id')[:8]
+    recent_qs = Transaction.objects.filter(user=request.user).order_by('-date', '-id')[:8]
     recent = []
     for t in recent_qs:
         recent.append({
@@ -218,12 +236,13 @@ def dashboard(request):
         'category_data': category_data,
         'recent': recent,
         'item_count': items.count(),
-        'party_count': Party.objects.count(),
+        'party_count': Party.objects.filter(user=request.user).count(),
     })
 
 
 # ============ Reports endpoint ============
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def reports(request):
     report_type = request.query_params.get('type', 'sale')
     from_date = request.query_params.get('from_date')
@@ -239,7 +258,7 @@ def reports(request):
     result = {}
 
     if report_type == 'sale':
-        txns = [t for t in Transaction.objects.filter(type='SaleInvoice') if in_range(str(t.date))]
+        txns = [t for t in Transaction.objects.filter(type='SaleInvoice', user=request.user) if in_range(str(t.date))]
         result['rows'] = [{
             'id': t.id, 'invoice_no': t.invoice_no, 'date': str(t.date),
             'party_name': t.party_name, 'total_amount': float(t.total_amount),
@@ -249,7 +268,7 @@ def reports(request):
         result['balance'] = float(sum((t.balance_amount for t in txns), Decimal(0)))
 
     elif report_type == 'purchase':
-        txns = [t for t in Transaction.objects.filter(type='PurchaseBill') if in_range(str(t.date))]
+        txns = [t for t in Transaction.objects.filter(type='PurchaseBill', user=request.user) if in_range(str(t.date))]
         result['rows'] = [{
             'id': t.id, 'invoice_no': t.invoice_no, 'date': str(t.date),
             'party_name': t.party_name, 'total_amount': float(t.total_amount),
@@ -259,10 +278,10 @@ def reports(request):
         result['balance'] = float(sum((t.balance_amount for t in txns), Decimal(0)))
 
     elif report_type == 'pl':
-        sales = [t for t in Transaction.objects.filter(type='SaleInvoice') if in_range(str(t.date))]
-        purchases = [t for t in Transaction.objects.filter(type='PurchaseBill') if in_range(str(t.date))]
-        exps = [e for e in Expense.objects.all() if in_range(str(e.date))]
-        incomes = [i for i in OtherIncome.objects.all() if in_range(str(i.date))]
+        sales = [t for t in Transaction.objects.filter(type='SaleInvoice', user=request.user) if in_range(str(t.date))]
+        purchases = [t for t in Transaction.objects.filter(type='PurchaseBill', user=request.user) if in_range(str(t.date))]
+        exps = [e for e in Expense.objects.filter(user=request.user) if in_range(str(e.date))]
+        incomes = [i for i in OtherIncome.objects.filter(user=request.user) if in_range(str(i.date))]
         sales_revenue = float(sum((t.sub_total for t in sales), Decimal(0)))
         purchase_cost = float(sum((t.sub_total for t in purchases), Decimal(0)))
         exp_total = float(sum((e.amount for e in exps), Decimal(0)))
@@ -277,7 +296,7 @@ def reports(request):
         }
 
     elif report_type == 'gstr1':
-        txns = [t for t in Transaction.objects.filter(type='SaleInvoice') if in_range(str(t.date))]
+        txns = [t for t in Transaction.objects.filter(type='SaleInvoice', user=request.user) if in_range(str(t.date))]
         hsn_map = {}
         for t in txns:
             for line in t.lines.all():
@@ -298,8 +317,8 @@ def reports(request):
         } for k, v in hsn_map.items()]
 
     elif report_type == 'gstr3b':
-        sales = [t for t in Transaction.objects.filter(type='SaleInvoice') if in_range(str(t.date))]
-        purchases = [t for t in Transaction.objects.filter(type='PurchaseBill') if in_range(str(t.date))]
+        sales = [t for t in Transaction.objects.filter(type='SaleInvoice', user=request.user) if in_range(str(t.date))]
+        purchases = [t for t in Transaction.objects.filter(type='PurchaseBill', user=request.user) if in_range(str(t.date))]
         outward_taxable = float(sum((t.sub_total for t in sales), Decimal(0)))
         outward_tax = float(sum((t.cgst + t.sgst + t.igst for t in sales), Decimal(0)))
         inward_taxable = float(sum((t.sub_total for t in purchases), Decimal(0)))
@@ -318,10 +337,10 @@ def reports(request):
             'unit': i.unit, 'value': float(i.stock * i.purchase_price),
             'min_stock': float(i.min_stock),
             'low': i.stock <= i.min_stock,
-        } for i in Item.objects.all().order_by('name')]
+        } for i in Item.objects.filter(user=request.user).order_by('name')]
 
     elif report_type == 'all':
-        txns = [t for t in Transaction.objects.all() if in_range(str(t.date))]
+        txns = [t for t in Transaction.objects.filter(user=request.user) if in_range(str(t.date))]
         txns.sort(key=lambda t: t.date, reverse=True)
         result['rows'] = [{
             'id': t.id, 'date': str(t.date), 'type': t.type,
@@ -334,12 +353,13 @@ def reports(request):
 
 # ============ Party balances endpoint ============
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def party_balances(request):
     """Compute receivable/payable balances for each party from transactions."""
-    parties = Party.objects.all().order_by('name')
+    parties = Party.objects.filter(user=request.user).order_by('name')
     result = []
     for p in parties:
-        txns = Transaction.objects.filter(party_id=p.id)
+        txns = Transaction.objects.filter(party_id=p.id, user=request.user)
         receivable = sum(
             (t.balance_amount for t in txns if t.type in ('SaleInvoice', 'SaleReturn')),
             Decimal(0),
@@ -360,3 +380,45 @@ def party_balances(request):
             'payable': float(max(0, payable - receivable)) if payable > receivable else 0,
         })
     return Response(result)
+
+
+# ============ Auth / User Management ============
+class UserListView(generics.ListCreateAPIView):
+    """List all users (superadmin only) or create a new user."""
+    permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        return User.objects.all().order_by('-date_joined')
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return CreateUserSerializer
+        return UserSerializer
+
+
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Retrieve, update, or delete a user (superadmin only)."""
+    permission_classes = [IsAdminUser]
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+    def perform_destroy(self, instance):
+        # Prevent self-deletion
+        if instance == self.request.user:
+            raise ValidationError({'detail': 'Cannot delete your own account.'})
+        instance.delete()
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def me(request):
+    """Return the current authenticated user's info."""
+    user = request.user
+    return Response({
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'is_superuser': user.is_superuser,
+        'is_staff': user.is_staff,
+        'is_active': user.is_active,
+    })

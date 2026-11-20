@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.contrib.auth.models import User
 from .models import (
     BusinessProfile, Party, Item, Transaction, TransactionLine,
     Expense, OtherIncome, BankAccount, Settings,
@@ -6,12 +7,35 @@ from .models import (
 )
 
 
+# ============ User Serializers ============
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'is_superuser', 'is_active', 'date_joined']
+
+
+class CreateUserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, min_length=4)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'password', 'is_superuser']
+
+    def create(self, validated_data):
+        password = validated_data.pop('password')
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+
 class CategorySerializer(serializers.ModelSerializer):
     item_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'description', 'created_at', 'item_count']
+        fields = ['id', 'user', 'name', 'description', 'created_at', 'item_count']
+        extra_kwargs = {'user': {'read_only': True}}
 
     def get_item_count(self, obj):
         return obj.items.count()
@@ -22,7 +46,8 @@ class UnitSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Unit
-        fields = ['id', 'name', 'short_name', 'created_at', 'item_count']
+        fields = ['id', 'user', 'name', 'short_name', 'created_at', 'item_count']
+        extra_kwargs = {'user': {'read_only': True}}
 
     def get_item_count(self, obj):
         return obj.items.count()
@@ -32,18 +57,21 @@ class WarehouseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Warehouse
         fields = '__all__'
+        extra_kwargs = {'user': {'read_only': True}}
 
 
 class BusinessProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = BusinessProfile
         fields = '__all__'
+        extra_kwargs = {'user': {'read_only': True}}
 
 
 class PartySerializer(serializers.ModelSerializer):
     class Meta:
         model = Party
         fields = '__all__'
+        extra_kwargs = {'user': {'read_only': True}}
 
 
 class ItemSerializer(serializers.ModelSerializer):
@@ -53,6 +81,7 @@ class ItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
         fields = '__all__'
+        extra_kwargs = {'user': {'read_only': True}}
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
@@ -69,6 +98,7 @@ class OpeningStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = OpeningStock
         fields = '__all__'
+        extra_kwargs = {'user': {'read_only': True}}
 
 
 class TransactionLineSerializer(serializers.ModelSerializer):
@@ -91,6 +121,7 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = '__all__'
+        extra_kwargs = {'user': {'read_only': True}}
 
     def create(self, validated_data):
         lines_data = validated_data.pop('lines', [])
@@ -147,21 +178,25 @@ class ExpenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Expense
         fields = '__all__'
+        extra_kwargs = {'user': {'read_only': True}}
 
 
 class OtherIncomeSerializer(serializers.ModelSerializer):
     class Meta:
         model = OtherIncome
         fields = '__all__'
+        extra_kwargs = {'user': {'read_only': True}}
 
 
 class BankAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = BankAccount
         fields = '__all__'
+        extra_kwargs = {'user': {'read_only': True}}
 
 
 class SettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Settings
         fields = '__all__'
+        extra_kwargs = {'user': {'read_only': True}}

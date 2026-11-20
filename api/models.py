@@ -4,6 +4,7 @@ from django.db import models
 # ============ Master Setup Models ============
 
 class Category(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -17,6 +18,7 @@ class Category(models.Model):
 
 
 class Unit(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=50, unique=True)   # e.g. "Pieces"
     short_name = models.CharField(max_length=20, unique=True)  # e.g. "PCS"
     created_at = models.DateTimeField(auto_now_add=True)
@@ -29,6 +31,7 @@ class Unit(models.Model):
 
 
 class Warehouse(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=255)
     address = models.TextField(blank=True)
     contact_person = models.CharField(max_length=100, blank=True)
@@ -44,6 +47,7 @@ class Warehouse(models.Model):
 
 
 class BusinessProfile(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=255, default='My Business')
     phone = models.CharField(max_length=30, blank=True)
     email = models.EmailField(blank=True)
@@ -63,6 +67,7 @@ class BusinessProfile(models.Model):
 
 
 class Party(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     PARTY_TYPES = [
         ('Customer', 'Customer'),
         ('Supplier', 'Supplier'),
@@ -91,6 +96,7 @@ class Party(models.Model):
 
 
 class Item(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=255)
     category = models.ForeignKey(
         Category, on_delete=models.SET_NULL, null=True, blank=True,
@@ -118,6 +124,7 @@ class Item(models.Model):
 
 
 class Transaction(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     TXN_TYPES = [
         ('SaleInvoice', 'Sale Invoice'),
         ('PurchaseBill', 'Purchase Bill'),
@@ -186,6 +193,7 @@ class TransactionLine(models.Model):
 
 
 class Expense(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     PAYMENT_TYPES = [
         ('Cash', 'Cash'), ('Cheque', 'Cheque'),
         ('UPI', 'UPI'), ('Bank Transfer', 'Bank Transfer'),
@@ -204,6 +212,7 @@ class Expense(models.Model):
 
 
 class OtherIncome(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     PAYMENT_TYPES = [
         ('Cash', 'Cash'), ('Cheque', 'Cheque'),
         ('UPI', 'UPI'), ('Bank Transfer', 'Bank Transfer'),
@@ -220,6 +229,7 @@ class OtherIncome(models.Model):
 
 
 class BankAccount(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     ACCOUNT_TYPES = [
         ('Bank', 'Bank'), ('Cash', 'Cash'),
         ('Wallet', 'Wallet'), ('Loan', 'Loan'),
@@ -238,6 +248,7 @@ class BankAccount(models.Model):
 
 
 class Settings(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     tax_rates = models.JSONField(default=list)
     invoice_prefix = models.CharField(max_length=20, default='INV')
     purchase_prefix = models.CharField(max_length=20, default='PUR')
@@ -262,6 +273,7 @@ class Settings(models.Model):
 
 
 class OpeningStock(models.Model):
+    user = models.ForeignKey('auth.User', on_delete=models.CASCADE, null=True, blank=True)
     item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='opening_stocks')
     warehouse = models.ForeignKey(
         Warehouse, on_delete=models.SET_NULL, null=True, blank=True,

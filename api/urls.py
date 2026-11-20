@@ -1,10 +1,12 @@
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import TokenObtainPairView
 from .views import (
     BusinessProfileViewSet, PartyViewSet, ItemViewSet,
     TransactionViewSet, ExpenseViewSet, OtherIncomeViewSet,
     BankAccountViewSet, SettingsViewSet,
     CategoryViewSet, UnitViewSet, WarehouseViewSet, OpeningStockViewSet,
     dashboard, reports, party_balances,
+    UserListView, UserDetailView, me,
 )
 from django.urls import path, include
 
@@ -27,4 +29,9 @@ urlpatterns = [
     path('dashboard/', dashboard, name='dashboard'),
     path('reports/', reports, name='reports'),
     path('party-balances/', party_balances, name='party-balances'),
+    # Auth endpoints
+    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('auth/users/', UserListView.as_view(), name='user-list'),
+    path('auth/users/<int:pk>/', UserDetailView.as_view(), name='user-detail'),
+    path('auth/me/', me, name='me'),
 ]

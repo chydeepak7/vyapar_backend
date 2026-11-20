@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
@@ -355,12 +355,15 @@ def reports(request):
         }
 
     elif report_type == 'stock':
+        stock_items = Item.objects.filter(user=request.user).select_related('unit').prefetch_related('unit_conversions').order_by('name')
         result['rows'] = [{
             'name': i.name, 'hsn': i.hsn, 'stock': float(i.stock),
-            'unit': i.unit, 'value': float(i.stock * i.purchase_price),
+            'unit': i.unit.short_name if i.unit_id else i.unit_name,
+            'stock_display': _stock_display(i),
+            'value': float(i.stock * i.purchase_price),
             'min_stock': float(i.min_stock),
             'low': i.stock <= i.min_stock,
-        } for i in Item.objects.filter(user=request.user).order_by('name')]
+        } for i in stock_items]
 
     elif report_type == 'all':
         txns = [t for t in Transaction.objects.filter(user=request.user) if in_range(str(t.date))]
@@ -372,6 +375,36 @@ def reports(request):
         } for t in txns]
 
     return Response(result)
+
+
+def _trim_qty(value):
+    number = Decimal(value or 0)
+    if number == number.to_integral():
+        return str(int(number))
+    return format(number.normalize(), 'f')
+
+
+def _stock_display(item):
+    """Show stock as whole purchase units plus the leftover small units.
+
+    Stock is stored in the small unit. The largest conversion is the purchase
+    unit, so 12 pieces with 1 Darzon = 12 Piece reads "1 Darzon and 0 Piece",
+    and 6 pieces reads "0 Darzon and 6 Piece".
+    """
+    small = item.unit.short_name if item.unit_id else (item.unit_name or '')
+    convs = list(item.unit_conversions.all())
+    qty = item.stock or Decimal(0)
+    if not convs:
+        return f'{_trim_qty(qty)} {small}'.strip()
+    big = max(convs, key=lambda c: c.conversion_factor)
+    factor = big.conversion_factor or Decimal(0)
+    if factor <= 0:
+        return f'{_trim_qty(qty)} {small}'.strip()
+    whole = (qty / factor).to_integral_value(rounding=ROUND_DOWN)
+    remainder = qty - (whole * factor)
+    if remainder < 0:
+        remainder = Decimal(0)
+    return f'{_trim_qty(whole)} {big.unit_name} and {_trim_qty(remainder)} {small}'.strip()
 
 
 # ============ Party balances endpoint ============

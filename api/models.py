@@ -84,10 +84,10 @@ class Party(models.Model):
     gstin = models.CharField(max_length=15, blank=True)
     billing_address = models.TextField(blank=True)
     shipping_address = models.TextField(blank=True)
-    opening_balance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    opening_balance = models.DecimalField(max_digits=24, decimal_places=10, default=0)
     balance_type = models.CharField(max_length=20, choices=BALANCE_TYPES, default='To Receive')
     group = models.CharField(max_length=100, blank=True)
-    credit_limit = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    credit_limit = models.DecimalField(max_digits=24, decimal_places=10, default=0)
     payment_terms = models.CharField(max_length=100, blank=True)  # e.g. "Net 30"
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -109,14 +109,14 @@ class Item(models.Model):
         related_name='items',
     )
     unit_name = models.CharField(max_length=20, blank=True)  # denormalised fallback
-    sale_price = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    purchase_price = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    stock = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    min_stock = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    sale_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    purchase_price = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    gst_rate = models.DecimalField(max_digits=15, decimal_places=10, default=0)
+    stock = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    min_stock = models.DecimalField(max_digits=24, decimal_places=10, default=0)
     barcode = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
-    mrp = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    mrp = models.DecimalField(max_digits=24, decimal_places=10, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -150,17 +150,17 @@ class Transaction(models.Model):
     party_name = models.CharField(max_length=255, blank=True)
     date = models.DateField()
     due_date = models.DateField(null=True, blank=True)
-    sub_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    discount_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    additional_charges = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    round_off = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    cgst = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    sgst = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    igst = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    cess = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    total_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    paid_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    balance_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    sub_total = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    discount_amount = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    additional_charges = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    round_off = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    cgst = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    sgst = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    igst = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    cess = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    total_amount = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    paid_amount = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    balance_amount = models.DecimalField(max_digits=24, decimal_places=10, default=0)
     payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPES, default='Credit')
     payment_mode = models.CharField(max_length=50, blank=True)
     notes = models.TextField(blank=True)
@@ -180,13 +180,13 @@ class TransactionLine(models.Model):
     item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True)
     item_name = models.CharField(max_length=255, blank=True)
     hsn = models.CharField(max_length=20, blank=True)
-    qty = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    free_qty = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    qty = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    free_qty = models.DecimalField(max_digits=24, decimal_places=10, default=0)
     unit = models.CharField(max_length=20, blank=True)
-    rate = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    rate = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    discount_percent = models.DecimalField(max_digits=15, decimal_places=10, default=0)
+    gst_rate = models.DecimalField(max_digits=15, decimal_places=10, default=0)
+    amount = models.DecimalField(max_digits=24, decimal_places=10, default=0)
 
     def __str__(self):
         return f'{self.item_name} x {self.qty}'
@@ -199,11 +199,11 @@ class Expense(models.Model):
         ('UPI', 'UPI'), ('Bank Transfer', 'Bank Transfer'),
     ]
     category = models.CharField(max_length=100)
-    amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    amount = models.DecimalField(max_digits=24, decimal_places=10, default=0)
     date = models.DateField()
     payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPES, default='Cash')
     note = models.TextField(blank=True)
-    gst_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    gst_amount = models.DecimalField(max_digits=24, decimal_places=10, default=0)
     is_gst = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -218,7 +218,7 @@ class OtherIncome(models.Model):
         ('UPI', 'UPI'), ('Bank Transfer', 'Bank Transfer'),
     ]
     category = models.CharField(max_length=100)
-    amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    amount = models.DecimalField(max_digits=24, decimal_places=10, default=0)
     date = models.DateField()
     payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPES, default='Cash')
     note = models.TextField(blank=True)
@@ -240,7 +240,7 @@ class BankAccount(models.Model):
     account_number = models.CharField(max_length=50, blank=True)
     ifsc = models.CharField(max_length=20, blank=True)
     branch = models.CharField(max_length=255, blank=True)
-    opening_balance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    opening_balance = models.DecimalField(max_digits=24, decimal_places=10, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -279,8 +279,8 @@ class OpeningStock(models.Model):
         Warehouse, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='opening_stocks',
     )
-    quantity = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    rate = models.DecimalField(max_digits=14, decimal_places=2, default=0)   # purchase/cost price at time of entry
+    quantity = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    rate = models.DecimalField(max_digits=24, decimal_places=10, default=0)   # purchase/cost price at time of entry
     date = models.DateField()
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

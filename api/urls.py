@@ -6,7 +6,7 @@ from .views import (
     BankAccountViewSet, SettingsViewSet,
     CategoryViewSet, UnitViewSet, WarehouseViewSet, OpeningStockViewSet,
     dashboard, reports, party_balances,
-    UserListView, UserDetailView, me,
+    UserListView, UserDetailView, me, change_password,
 )
 from django.urls import path, include
 
@@ -34,4 +34,5 @@ urlpatterns = [
     path('auth/users/', UserListView.as_view(), name='user-list'),
     path('auth/users/<int:pk>/', UserDetailView.as_view(), name='user-detail'),
     path('auth/me/', me, name='me'),
+    path('auth/change-password/', change_password, name='change-password'),
 ]

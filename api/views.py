@@ -84,6 +84,10 @@ class BusinessProfileViewSet(UserScopedViewSet):
     queryset = BusinessProfile.objects.all()
     serializer_class = BusinessProfileSerializer
 
+    def list(self, request, *args, **kwargs):
+        _ensure_user_defaults(request.user)
+        return super().list(request, *args, **kwargs)
+
 
 class PartyViewSet(UserScopedViewSet):
     queryset = Party.objects.all().order_by('name')
@@ -134,6 +138,10 @@ class BankAccountViewSet(UserScopedViewSet):
 class SettingsViewSet(UserScopedViewSet):
     queryset = Settings.objects.all()
     serializer_class = SettingsSerializer
+
+    def list(self, request, *args, **kwargs):
+        _ensure_user_defaults(request.user)
+        return super().list(request, *args, **kwargs)
 
 
 # ============ Aggregate / Dashboard endpoint ============
@@ -456,3 +464,33 @@ def me(request):
         'is_staff': user.is_staff,
         'is_active': user.is_active,
     })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """Allow the authenticated user to change their own password."""
+    old_password = request.data.get('old_password', '')
+    new_password = request.data.get('new_password', '')
+
+    if not old_password or not new_password:
+        return Response(
+            {'detail': 'Both old_password and new_password are required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not request.user.check_password(old_password):
+        return Response(
+            {'detail': 'Current password is incorrect.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if len(new_password) < 6:
+        return Response(
+            {'detail': 'New password must be at least 6 characters.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    request.user.set_password(new_password)
+    request.user.save()
+    return Response({'detail': 'Password changed successfully.'}, status=status.HTTP_200_OK)

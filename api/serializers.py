@@ -299,17 +299,95 @@ class TransactionSerializer(serializers.ModelSerializer):
 
 
 class ExpenseSerializer(serializers.ModelSerializer):
+    payment_lines = PaymentLineSerializer(many=True, required=False)
+
     class Meta:
         model = Expense
         fields = '__all__'
         extra_kwargs = {'user': {'read_only': True}}
 
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        if not rep.get('payment_lines'):
+            if instance.amount and instance.amount > 0:
+                rep['payment_lines'] = [{
+                    'id': None,
+                    'payment_type': instance.payment_type or 'Cash',
+                    'amount': str(instance.amount),
+                    'reference_no': '',
+                    'bank_account': None,
+                    'date': str(instance.date) if instance.date else None,
+                }]
+        return rep
+
+    def create(self, validated_data):
+        payment_lines_data = validated_data.pop('payment_lines', None)
+        if payment_lines_data:
+            validated_data['payment_type'] = payment_lines_data[0].get('payment_type', 'Cash')
+        expense = Expense.objects.create(**validated_data)
+        if payment_lines_data:
+            for pl_data in payment_lines_data:
+                PaymentLine.objects.create(expense=expense, **pl_data)
+        return expense
+
+    def update(self, instance, validated_data):
+        payment_lines_data = validated_data.pop('payment_lines', None)
+        if payment_lines_data:
+            validated_data['payment_type'] = payment_lines_data[0].get('payment_type', 'Cash')
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if payment_lines_data is not None:
+            instance.payment_lines.all().delete()
+            for pl_data in payment_lines_data:
+                PaymentLine.objects.create(expense=instance, **pl_data)
+        return instance
+
 
 class OtherIncomeSerializer(serializers.ModelSerializer):
+    payment_lines = PaymentLineSerializer(many=True, required=False)
+
     class Meta:
         model = OtherIncome
         fields = '__all__'
         extra_kwargs = {'user': {'read_only': True}}
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        if not rep.get('payment_lines'):
+            if instance.amount and instance.amount > 0:
+                rep['payment_lines'] = [{
+                    'id': None,
+                    'payment_type': instance.payment_type or 'Cash',
+                    'amount': str(instance.amount),
+                    'reference_no': '',
+                    'bank_account': None,
+                    'date': str(instance.date) if instance.date else None,
+                }]
+        return rep
+
+    def create(self, validated_data):
+        payment_lines_data = validated_data.pop('payment_lines', None)
+        if payment_lines_data:
+            validated_data['payment_type'] = payment_lines_data[0].get('payment_type', 'Cash')
+        income = OtherIncome.objects.create(**validated_data)
+        if payment_lines_data:
+            for pl_data in payment_lines_data:
+                PaymentLine.objects.create(other_income=income, **pl_data)
+        return income
+
+    def update(self, instance, validated_data):
+        payment_lines_data = validated_data.pop('payment_lines', None)
+        if payment_lines_data:
+            validated_data['payment_type'] = payment_lines_data[0].get('payment_type', 'Cash')
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        if payment_lines_data is not None:
+            instance.payment_lines.all().delete()
+            for pl_data in payment_lines_data:
+                PaymentLine.objects.create(other_income=instance, **pl_data)
+        return instance
 
 
 class BankAccountSerializer(serializers.ModelSerializer):

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import (
     BusinessProfile, Party, Item, ItemUnitConversion,
-    Transaction, TransactionLine,
+    Transaction, TransactionLine, PaymentLine,
     Expense, OtherIncome, BankAccount, Settings,
     Category, Unit, Warehouse, OpeningStock,
 )
@@ -174,31 +174,87 @@ class TransactionLineSerializer(serializers.ModelSerializer):
         ]
 
 
+class PaymentLineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentLine
+        fields = ['id', 'payment_type', 'amount', 'reference_no', 'bank_account', 'date']
+
+
 class TransactionSerializer(serializers.ModelSerializer):
     lines = TransactionLineSerializer(many=True, required=False)
     party_name = serializers.CharField(required=False, allow_blank=True)
+    payment_lines = PaymentLineSerializer(many=True, required=False)
 
     class Meta:
         model = Transaction
         fields = '__all__'
         extra_kwargs = {'user': {'read_only': True}}
 
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        # Synthesize payment_lines for legacy transactions that have none
+        if not rep.get('payment_lines'):
+            paid = instance.paid_amount or 0
+            if paid and paid > 0:
+                rep['payment_lines'] = [{
+                    'id': None,
+                    'payment_type': instance.payment_type or 'Cash',
+                    'amount': str(paid),
+                    'reference_no': instance.payment_mode or '',
+                    'bank_account': None,
+                    'date': str(instance.date) if instance.date else None,
+                }]
+        return rep
+
     def create(self, validated_data):
+        from decimal import Decimal
         lines_data = validated_data.pop('lines', [])
+        payment_lines_data = validated_data.pop('payment_lines', None)
+
+        # Auto-compute paid_amount from payment_lines if provided
+        if payment_lines_data is not None:
+            validated_data['paid_amount'] = sum(
+                (Decimal(str(pl.get('amount', 0))) for pl in payment_lines_data),
+                Decimal(0),
+            )
+            total = validated_data.get('total_amount', Decimal(0))
+            validated_data['balance_amount'] = max(
+                Decimal(0), total - validated_data['paid_amount'],
+            )
+
         transaction = Transaction.objects.create(**validated_data)
         for line_data in lines_data:
             TransactionLine.objects.create(transaction=transaction, **line_data)
         self._update_stock(transaction, lines_data, create=True)
+
+        if payment_lines_data is not None:
+            for pl_data in payment_lines_data:
+                PaymentLine.objects.create(transaction=transaction, **pl_data)
+
         return transaction
 
     def update(self, instance, validated_data):
+        from decimal import Decimal
         lines_data = validated_data.pop('lines', None)
+        payment_lines_data = validated_data.pop('payment_lines', None)
 
         # Restore stock from old lines before update
         self._update_stock(instance, list(instance.lines.values()), create=False, restore=True)
 
+        # Auto-compute paid_amount from payment_lines if provided
+        if payment_lines_data is not None:
+            validated_data['paid_amount'] = sum(
+                (Decimal(str(pl.get('amount', 0))) for pl in payment_lines_data),
+                Decimal(0),
+            )
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+
+        if payment_lines_data is not None:
+            total = instance.total_amount or Decimal(0)
+            instance.balance_amount = max(Decimal(0), total - instance.paid_amount)
+
         instance.save()
 
         if lines_data is not None:
@@ -206,6 +262,11 @@ class TransactionSerializer(serializers.ModelSerializer):
             for line_data in lines_data:
                 TransactionLine.objects.create(transaction=instance, **line_data)
             self._update_stock(instance, lines_data, create=True)
+
+        if payment_lines_data is not None:
+            instance.payment_lines.all().delete()
+            for pl_data in payment_lines_data:
+                PaymentLine.objects.create(transaction=instance, **pl_data)
 
         return instance
 

@@ -12,7 +12,7 @@ from django.contrib.auth.models import User
 
 from .models import (
     BusinessProfile, Party, Item, ItemUnitConversion, Transaction, Expense,
-    OtherIncome, BankAccount, Settings,
+    OtherIncome, BankAccount, Settings, PaymentLine,
     Category, Unit, Warehouse, OpeningStock,
 )
 from .serializers import (
@@ -189,13 +189,22 @@ def dashboard(request):
     stock_value = sum((i.stock * i.purchase_price for i in items), Decimal(0))
     total_expenses = sum((e.amount for e in expenses), Decimal(0))
 
+    # Cash in hand: cash account openings + cash received from sales
+    # For new-style transactions with PaymentLine records, sum cash lines.
+    # For old-style transactions (no payment lines), fall back to paid_amount.
     cash_in_hand = sum(
         (a.opening_balance for a in bank_accounts if a.type == 'Cash'),
         Decimal(0),
-    ) + sum(
-        (t.paid_amount for t in sales if t.payment_type == 'Cash'),
-        Decimal(0),
     )
+    for t in sales:
+        pl = list(t.payment_lines.all())
+        if pl:
+            cash_in_hand += sum(
+                (line.amount for line in pl if line.payment_type == 'Cash'),
+                Decimal(0),
+            )
+        elif t.payment_type == 'Cash':
+            cash_in_hand += t.paid_amount
 
     # Monthly trend - last 12 months
     monthly = []

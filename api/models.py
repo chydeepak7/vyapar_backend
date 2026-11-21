@@ -198,6 +198,32 @@ class Transaction(models.Model):
         return f'{self.invoice_no} - {self.party_name}'
 
 
+class PaymentLine(models.Model):
+    """A single payment entry within a transaction — supports split payments.
+
+    One transaction can have multiple PaymentLines, e.g. half Cash + half Cheque.
+    `paid_amount` and `balance_amount` on the parent Transaction are auto-computed
+    from these lines.
+    """
+    PAYMENT_TYPES = Transaction.PAYMENT_TYPES
+    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, related_name='payment_lines')
+    payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPES, default='Cash')
+    amount = models.DecimalField(max_digits=24, decimal_places=10, default=0)
+    reference_no = models.CharField(max_length=100, blank=True, help_text='Cheque no, UPI ref, etc.')
+    bank_account = models.ForeignKey(
+        'BankAccount', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='payment_lines',
+    )
+    date = models.DateField(null=True, blank=True, help_text='Cheque clearance date, etc.')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f'{self.payment_type} – {self.amount}'
+
+
 class TransactionLine(models.Model):
     transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, related_name='lines')
     item = models.ForeignKey(Item, on_delete=models.SET_NULL, null=True, blank=True)
